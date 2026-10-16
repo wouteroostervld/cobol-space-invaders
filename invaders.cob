@@ -305,6 +305,7 @@ WORKING-STORAGE SECTION.
 01  BOMBS.
     05  BOMB-TIMER              PIC S9(4) COMP-5.
     05  BOMB-LIMIT              PIC S9(4) COMP-5.
+    05  BOMB-DELAY              PIC S9(4) COMP-5.
     05  BOMB                    OCCURS MAX-BOMBS TIMES.
         10  BOMB-FLAG           PIC X.
             88  BOMB-ACTIVE     VALUE "Y".
@@ -673,7 +674,12 @@ START-WAVE.
     PERFORM VARYING I FROM 1 BY 1 UNTIL I > MAX-EXPL
         MOVE 0 TO EXPL-TIMER(I)
     END-PERFORM
-    COMPUTE BOMB-LIMIT = FUNCTION MIN(2 + WAVE, MAX-BOMBS)
+    IF WAVE < 3
+        MOVE 3 TO BOMB-DELAY
+    ELSE
+        MOVE 2 TO BOMB-DELAY
+    END-IF
+    COMPUTE BOMB-LIMIT = FUNCTION MIN(1 + WAVE, MAX-BOMBS)
     MOVE SPACES TO MSG-TEXT
     STRING "W A V E   " WAVE DELIMITED BY SIZE INTO MSG-TEXT
     MOVE 12 TO MSG-LEN
@@ -721,9 +727,12 @@ CLEAR-SHOTS.
 
 *>  Fewer invaders left (or a later wave) means faster marching.
 SET-MOVE-DELAY.
-    COMPUTE MOVE-DELAY = 1 + ALIVE-COUNT / 5 - (WAVE - 1)
-    IF MOVE-DELAY < 1
-        MOVE 1 TO MOVE-DELAY
+*>  Wave 1 goes from 17 frames per step with a full formation down
+*>  to 6 with the last invader; later waves are a frame faster each,
+*>  but never faster than one step per 3 frames.
+    COMPUTE MOVE-DELAY = 6 + ALIVE-COUNT / 5 - (WAVE - 1)
+    IF MOVE-DELAY < 3
+        MOVE 3 TO MOVE-DELAY
     END-IF.
 
 READ-INPUT.
@@ -964,8 +973,8 @@ DROP-BOMB.
         END-IF
     END-PERFORM
     COMPUTE RND = FUNCTION RANDOM * 1000
-    IF K < BOMB-LIMIT AND RND < 30 + WAVE * 10 AND ALIVE-COUNT > 0
-        IF FUNCTION RANDOM < 0.5
+    IF K < BOMB-LIMIT AND RND < 12 + WAVE * 8 AND ALIVE-COUNT > 0
+        IF FUNCTION RANDOM < 0.3
             COMPUTE C = (PLAYER-X + 1 - FORM-X) / A-XSTEP + 1
         ELSE
             COMPUTE C = FUNCTION RANDOM * A-COLS + 1
@@ -1006,7 +1015,7 @@ DROP-BOMB.
 UPDATE-BOMBS.
     SET PLAYER-OK TO TRUE
     ADD 1 TO BOMB-TIMER
-    IF BOMB-TIMER >= 2
+    IF BOMB-TIMER >= BOMB-DELAY
         MOVE 0 TO BOMB-TIMER
         PERFORM VARYING I FROM 1 BY 1 UNTIL I > MAX-BOMBS
             IF BOMB-ACTIVE(I)
